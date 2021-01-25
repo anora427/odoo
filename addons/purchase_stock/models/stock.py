@@ -3,6 +3,7 @@
 
 from odoo import api, fields, models, _
 from odoo.tools.float_utils import float_round
+from odoo.exceptions import RedirectWarning
 
 
 class StockPicking(models.Model):
@@ -215,6 +216,27 @@ class Orderpoint(models.Model):
         result['domain'] = "[('id','in',%s)]" % (purchase_ids.ids)
 
         return result
+
+    def action_replenish(self):
+        if self.route_id == self.env.ref('purchase_stock.route_warehouse0_buy'):
+            supplier = self.product_id.with_company(self.company_id.id)._select_seller(
+                                        quantity=self.product_min_qty,
+                                        uom_id=self.product_uom)
+
+            if not supplier and self.env['product.product'].check_access_rights('write'):
+                error_msg = _('There is no matching vendor price to generate the purchase order for product. You can edit and add the vendor on product.')
+                action_error = {
+                    'name': _('Product'),
+                    'type': 'ir.actions.act_window',
+                    'res_model': 'product.product',
+                    'target': 'current',
+                    'res_id': self.product_id.id,
+                    'views': [(self.env.ref('product.product_normal_form_view').id, 'form')],
+                    'context': {'form_view_initial_mode': 'edit'}
+                }
+                raise RedirectWarning(error_msg, action_error, _('Edit Product'))
+
+        return super().action_replenish()
 
     def _get_replenishment_order_notification(self):
         self.ensure_one()
