@@ -308,6 +308,11 @@ class StockWarehouseOrderpoint(models.Model):
         """
         action = self.env["ir.actions.actions"]._for_xml_id("stock.action_orderpoint_replenish")
         action['context'] = self.env.context
+        self._orderpoint_cleanup()
+        return action
+
+    @api.autovacuum
+    def _orderpoint_cleanup(self):
         # Search also with archived ones to avoid to trigger product_location_check SQL constraints later
         # It means that when there will be a archived orderpoint on a location + product, the replenishment
         # report won't take in account this location + product and it won't create any manual orderpoint
@@ -328,7 +333,7 @@ class StockWarehouseOrderpoint(models.Model):
                 continue
             to_refill[(group['product_id'][0], warehouse_id)] = group['product_qty']
         if not to_refill:
-            return action
+            return
 
         # Recompute the forecasted quantity for missing product today but at this time
         # with their real lead days.
@@ -349,7 +354,7 @@ class StockWarehouseOrderpoint(models.Model):
         for key in key_to_remove:
             del to_refill[key]
         if not to_refill:
-            return action
+            return
 
         # Remove incoming quantity from other origin than moves (e.g RFQ)
         product_ids, warehouse_ids = zip(*to_refill)
@@ -408,7 +413,7 @@ class StockWarehouseOrderpoint(models.Model):
         for orderpoint in orderpoints:
             orderpoint.route_id = orderpoint.product_id.route_ids[:1] or orderpoint._set_default_route_id()
             orderpoint.qty_multiple = orderpoint._get_qty_multiple_to_order()
-        return action
+        return
 
     @api.model
     def _get_orderpoint_values(self, product, location):
